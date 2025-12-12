@@ -1,0 +1,170 @@
+/*
+This program makes a small car drive autonomously while avoiding obstacles.
+It uses a servo-mounted ultrasonic sensor to “look” in front, left, and right.
+*/
+
+#include <Servo.h>  // Include servo library to control servo motor
+Servo myservo;      // Create servo object
+
+// ---------------------------
+// ULTRASONIC SENSOR PINS
+// ---------------------------
+const int Trig = 13; // Trigger pin sends ultrasonic pulse
+const int Echo = 12; // Echo pin receives the reflected pulse
+
+// ---------------------------
+// MOTOR DRIVER PINS
+// ---------------------------
+int PWMA = 5;   // Motor A speed (PWM)
+int AIN1 = 7;   // Motor A direction
+int PWMB = 6;   // Motor B speed (PWM)
+int BIN1 = 8;   // Motor B direction
+int STBY = 3;   // Motor driver standby pin
+
+// =========================================================
+// SETUP BLOCK — Runs once at start
+// =========================================================
+void setup() {
+  myservo.attach(10);     // Attach servo to pin 10
+  Serial.begin(9600);     // Start serial monitor for debugging
+
+  // Ultrasonic sensor setup
+  pinMode(Trig, OUTPUT);  // Trigger sends pulse
+  pinMode(Echo, INPUT);   // Echo receives pulse
+
+  // Motor driver setup
+  pinMode(PWMA, OUTPUT);
+  pinMode(AIN1, OUTPUT);
+  pinMode(PWMB, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(STBY, OUTPUT);
+  digitalWrite(STBY, HIGH); // Enable motors
+}
+
+// =========================================================
+// MAIN LOOP
+// =========================================================
+void loop() {
+  // ---------------------------
+  // LOOK FORWARD
+  // ---------------------------
+  myservo.write(90);          // Servo faces forward
+  delay(300);
+  float forwardDistance = DISTANCE(); // Measure distance ahead
+
+  if (forwardDistance == 0 || forwardDistance >= 25) {
+    Forward(70); // Path clear → move forward
+    return;
+  }
+
+  Stop();       // Obstacle detected → stop
+  delay(200);
+
+  // ---------------------------
+  // LOOK LEFT
+  // ---------------------------
+  myservo.write(150);         // Servo turns left
+  delay(400);
+  float leftDistance = DISTANCE(); // Measure distance to the left
+  if (leftDistance == 0) leftDistance = 300; // Treat as clear if no reading
+  if (leftDistance > 25) {
+    Serial.println("Turning LEFT...");
+    Left(70);   // Turn left if path clear
+    delay(500);
+    return;
+  }
+
+  // ---------------------------
+  // LOOK RIGHT
+  // ---------------------------
+  myservo.write(30);           // Servo turns right
+  delay(400);
+  float rightDistance = DISTANCE(); // Measure distance to the right
+  if (rightDistance == 0) rightDistance = 300;
+  Serial.print("Right distance: ");
+  Serial.println(rightDistance);
+
+  // ---------------------------
+  // IF RIGHT BLOCKED → BACKWARD + 180 TURN + FORWARD
+  // ---------------------------
+  if (rightDistance < 25) {
+    Serial.println("RIGHT BLOCKED → BACKWARD + 180 TURN");
+    Backward(70);
+    delay(600);
+    Left(70);    // Turn around
+    delay(1000);
+    Forward(70);
+    delay(500);
+    return;
+  }
+
+  // ---------------------------
+  // IF RIGHT CLEAR → TURN RIGHT
+  // ---------------------------
+  if (rightDistance > 25) {
+    Serial.println("Turning RIGHT...");
+    Right(70);
+    delay(500);
+    return;
+  }
+
+  Stop(); // Safety stop
+}
+
+// =========================================================
+// MOTOR CONTROL FUNCTIONS
+// =========================================================
+void Forward(int x) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, x);
+  digitalWrite(STBY, HIGH); // Enable motors
+}
+
+void Backward(int x) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, x);
+  digitalWrite(STBY, HIGH);
+}
+
+void Left(int x) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, x);
+  digitalWrite(STBY, HIGH);
+}
+
+void Right(int x) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, x);
+  digitalWrite(STBY, HIGH);
+}
+
+void Stop() {
+  analogWrite(PWMA, 0);
+  analogWrite(PWMB, 0);
+}
+
+// =========================================================
+// ULTRASONIC DISTANCE FUNCTION
+// =========================================================
+float DISTANCE() {
+  digitalWrite(Trig, LOW);          // Clear trigger
+  delayMicroseconds(2);
+  digitalWrite(Trig, HIGH);         // Send 10µs pulse
+  delayMicroseconds(10);
+  digitalWrite(Trig, LOW);
+
+  long duration = pulseIn(Echo, HIGH, 25000); // Measure return time
+  if (duration == 0) return 0;                // No object detected
+
+  float distance = (duration * 0.0343) / 2.0; // Convert to cm
+  if (distance > 300) return 0;               // Ignore too-far readings
+  return distance;
+}
