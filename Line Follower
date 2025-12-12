@@ -1,0 +1,220 @@
+/*
+  This program controls a line-following robot using three sensors.
+  It constantly reads the left, middle, and right sensors to stay on
+  the black line. If the robot loses the line, it runs a recovery
+  routine that slowly turns left and right while checking the sensors
+  until the line is found again.
+*/
+
+
+// ---------------------------
+// IR REMOTE + LINE FOLLOWER
+// ---------------------------
+
+#include <IRremote.h>    // Library for IR remote (included but not used here)
+
+// Pin that receives IR signals
+const int IR_RECEIVE_PIN = 9; 
+
+// ---------------------------
+// LINE FOLLOWER SENSOR PINS
+// ---------------------------
+
+// Analog pins for line sensors
+int rightsensor  = A0; 
+int middlesensor = A1; 
+int leftsensor   = A2; 
+
+// Variables to store sensor readings
+int rightValue  = 0; 
+int middleValue = 0; 
+int leftValue   = 0; 
+
+// ---------------------------
+// LINE RECOVERY PARAMETERS
+// ---------------------------
+
+// Number of micro-steps to complete ~90° turn
+const int TURN_STEPS = 35;   
+
+// Delay between micro-steps (ms)
+const int STEP_DELAY = 20;   
+
+// Speed while turning/searching
+const int TURN_SPEED = 70;   
+
+// Sensor thresholds
+const int MID_THRESH  = 100;  // Middle sensor threshold
+const int SIDE_THRESH = 75;   // Side sensors threshold
+
+// ---------------------------
+// MOVEMENT FUNCTIONS
+// ---------------------------
+
+// Move forward
+void Forward(int x) { 
+  analogWrite(5, x); 
+  digitalWrite(7, HIGH); 
+  analogWrite(6, x); 
+  digitalWrite(8, HIGH); 
+  digitalWrite(3, HIGH); 
+} 
+
+// Move backward
+void Backward(int x) { 
+  analogWrite(5, x); 
+  digitalWrite(7, LOW); 
+  analogWrite(6, x); 
+  digitalWrite(8, LOW); 
+  digitalWrite(3, HIGH); 
+} 
+
+// Turn left in place
+void Left(int x) { 
+  analogWrite(5, x); 
+  digitalWrite(7, HIGH); 
+  analogWrite(6, x); 
+  digitalWrite(8, LOW); 
+  digitalWrite(3, HIGH); 
+} 
+
+// Turn right in place
+void Right(int x) { 
+  analogWrite(5, x); 
+  digitalWrite(7, LOW); 
+  analogWrite(6, x); 
+  digitalWrite(8, HIGH); 
+  digitalWrite(3, HIGH); 
+} 
+
+// Stop motors
+void Stop() { 
+  analogWrite(5, 0); 
+  analogWrite(6, 0); 
+  digitalWrite(7, LOW); 
+  digitalWrite(8, LOW); 
+  digitalWrite(3, HIGH); 
+} 
+
+// ---------------------------
+// LINE RECOVERY FUNCTION
+// ---------------------------
+
+void recoverLine() {
+
+  // ----- TURN LEFT WHILE CHECKING -----
+  for (int i = 0; i < TURN_STEPS; i++) {
+    Left(TURN_SPEED);
+    delay(STEP_DELAY);
+
+    // Update sensor readings
+    rightValue  = analogRead(rightsensor);
+    middleValue = analogRead(middlesensor);
+    leftValue   = analogRead(leftsensor);
+
+    // Stop if line detected
+    if (middleValue > MID_THRESH || leftValue > SIDE_THRESH) {
+      Stop();
+      delay(60);
+      return; // Line found
+    }
+  }
+
+  Stop();
+  delay(100);
+
+  // ----- RETURN TO CENTER -----
+  for (int i = 0; i < TURN_STEPS; i++) {
+    Right(TURN_SPEED);
+    delay(STEP_DELAY);
+  }
+
+  Stop();
+  delay(100);
+
+  // ----- TURN RIGHT WHILE CHECKING -----
+  for (int i = 0; i < TURN_STEPS; i++) {
+    Right(TURN_SPEED);
+    delay(STEP_DELAY);
+
+    rightValue  = analogRead(rightsensor);
+    middleValue = analogRead(middlesensor);
+    leftValue   = analogRead(leftsensor);
+
+    if (middleValue > MID_THRESH || rightValue > SIDE_THRESH) {
+      Stop();
+      delay(60);
+      return; // Line found
+    }
+  }
+
+  Stop();
+  delay(100);
+
+  // ----- RETURN TO CENTER -----
+  for (int i = 0; i < TURN_STEPS; i++) {
+    Left(TURN_SPEED);
+    delay(STEP_DELAY);
+  }
+
+  Stop();
+  delay(100);
+
+  // ----- FALLBACK NUDGE -----
+  Right(30);
+  delay(200);
+  Stop();
+  delay(80);
+}
+
+// ---------------------------
+// SETUP
+// ---------------------------
+
+void setup() { 
+  // Motor driver pins (TB6612FNG)
+  pinMode(5, OUTPUT); // PWMA
+  pinMode(7, OUTPUT); // AIN1
+  pinMode(3, OUTPUT); // STBY
+  digitalWrite(3, HIGH); // Wake motor driver
+  pinMode(6, OUTPUT); // PWMB
+  pinMode(8, OUTPUT); // BIN1
+
+  Serial.begin(9600); // For debugging sensor values
+
+  // Line sensors
+  pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
+  pinMode(A2, INPUT);
+} 
+
+// ---------------------------
+// MAIN LOOP
+// ---------------------------
+
+void loop() { 
+  // Read sensor values each loop
+  rightValue  = analogRead(A0);
+  middleValue = analogRead(A1);
+  leftValue   = analogRead(A2);
+
+  Serial.print(rightValue);
+  Serial.print("    ");
+  Serial.print(middleValue);
+  Serial.print("    ");
+  Serial.println(leftValue);
+
+  // ----- LINE FOLLOWING LOGIC -----
+  if (middleValue >= MID_THRESH) {
+    Forward(65);        // Move forward if middle sensor sees line
+  }
+  else if (rightValue >= SIDE_THRESH) {
+    Right(75);          // Turn right if right sensor sees line
+  }
+  else if (leftValue >= SIDE_THRESH) {
+    Left(75);           // Turn left if left sensor sees line
+  }
+  else {
+    recoverLine();      // Lost line → run recovery routine
+  }
+}
