@@ -1,0 +1,184 @@
+/*
+This program allows a robot car to be controlled using an infrared (IR) remote. 
+Each button on the remote corresponds to a specific movement: forward, backward, left, right, diagonal motions, or stop. 
+The robot’s speed can also be increased or decreased using dedicated buttons.
+*/
+
+// ---------------------------
+// IR REMOTE CONTROL
+// ---------------------------
+
+#include <IRremote.h>  // Library for reading signals from IR remote
+
+// Pin that receives IR signals
+const int IR_RECEIVE_PIN = 9;  
+
+// ---------------------------
+// MOTOR CONTROL VARIABLES
+// ---------------------------
+
+// Default speed (adjustable via remote)
+int x = 50;  
+
+// ---------------------------
+// SETUP BLOCK — Runs once
+// ---------------------------
+void setup() {  
+  // Motor pins (TB6612FNG motor driver)
+  pinMode(5, OUTPUT); // PWMA speed motor A
+  pinMode(7, OUTPUT); // AIN1 direction motor A
+  pinMode(3, OUTPUT); // STBY standby pin
+  pinMode(6, OUTPUT); // PWMB speed motor B
+  pinMode(8, OUTPUT); // BIN1 direction motor B
+
+  // Enable motor driver
+  digitalWrite(3, HIGH);  
+
+  // Initialize serial monitor for debugging
+  Serial.begin(9600);
+
+  // Initialize IR receiver with LED feedback
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK); 
+}  
+
+// ---------------------------
+// MAIN LOOP
+// ---------------------------
+void loop() {  
+  // Check if a signal is received
+  if (IrReceiver.decode()) {  
+
+    // Call all movement functions each loop (they only act if correct button is pressed)
+    Forward(x); 
+    Left(x); 
+    Right(x); 
+    Backward(x); 
+    Stop(); 
+
+    // Adjust speed via remote buttons
+    increaseSpeed(); 
+    decreaseSpeed(); 
+
+    // Prepare to receive the next IR signal
+    IrReceiver.resume();  
+  }  
+}  
+
+// ---------------------------
+// MOVEMENT FUNCTIONS
+// ---------------------------
+
+// Move forward if "Forward" button pressed
+void Forward(int x) {  
+  if (IrReceiver.decodedIRData.decodedRawData == 0xB946FF00) {  
+    analogWrite(5, x);  
+    digitalWrite(7, 1);  
+    analogWrite(6, x);  
+    digitalWrite(8, 1);  
+    digitalWrite(3, 1);  
+  }  
+}  
+
+// Move backward if "Backward" button pressed
+void Backward(int x) {  
+  if (IrReceiver.decodedIRData.decodedRawData == 0xEA15FF00) {  
+    analogWrite(5, x);  
+    digitalWrite(7, 0);  
+    analogWrite(6, x);  
+    digitalWrite(8, 0);  
+    digitalWrite(3, 1);  
+  }  
+}  
+
+// Turn left in place if "Left" button pressed
+void Left(int x) {  
+  if (IrReceiver.decodedIRData.decodedRawData == 0xBB44FF00) {  
+    analogWrite(5, x);  
+    digitalWrite(7, 1);  
+    analogWrite(6, x);  
+    digitalWrite(8, 0);  
+    digitalWrite(3, 1);  
+  }  
+}  
+
+// Turn right in place if "Right" button pressed
+void Right(int x) {  
+  if (IrReceiver.decodedIRData.decodedRawData == 0xBC43FF00) {  
+    analogWrite(5, x);  
+    digitalWrite(7, 0);  
+    analogWrite(6, x);  
+    digitalWrite(8, 1);  
+    digitalWrite(3, 1);  
+  }  
+}  
+
+// Move forward-left (diagonal) — reduces right motor speed
+void LeftForward(float x) {  
+  float y = x * 0.5;  
+  analogWrite(5, x);  
+  digitalWrite(7, 1);  
+  analogWrite(6, y);  
+  digitalWrite(8, 1);  
+  digitalWrite(3, 1);  
+}  
+
+// Move backward-left (diagonal) — reduces right motor speed
+void LeftBackward(float x) {  
+  float y = x * 0.5;  
+  analogWrite(5, x);  
+  digitalWrite(7, 0);  
+  analogWrite(6, y);  
+  digitalWrite(8, 0);  
+  digitalWrite(3, 1);  
+}  
+
+// Move forward-right (diagonal) — reduces left motor speed
+void RightForward(float x) {  
+  float y = x * 0.5;  
+  analogWrite(5, y);  
+  digitalWrite(7, 1);  
+  analogWrite(6, x);  
+  digitalWrite(8, 1);  
+  digitalWrite(3, 1);  
+}  
+
+// Move backward-right (diagonal) — reduces left motor speed
+void RightBackward(float x) {  
+  float y = x * 0.5;  
+  analogWrite(5, y);  
+  digitalWrite(7, 0);  
+  analogWrite(6, x);  
+  digitalWrite(8, 0);  
+  digitalWrite(3, 1);  
+}  
+
+// Stop the robot if "Stop" button pressed
+void Stop() {  
+  if (IrReceiver.decodedIRData.decodedRawData == 0xBF40FF00) {  
+    analogWrite(5, 0);  
+    analogWrite(6, 0);  
+    digitalWrite(7, 1);  
+    digitalWrite(8, 1);  
+    digitalWrite(3, 1);  
+  }  
+}  
+
+// ---------------------------
+// SPEED CONTROL
+// ---------------------------
+
+// Increase speed when "+" button pressed
+void increaseSpeed() {  
+  if (IrReceiver.decodedIRData.decodedRawData == 0xBD42FF00) {  
+    x += 10;  
+    if (x > 255) x = 255;  
+  }  
+}  
+
+// Decrease speed when "-" button pressed
+void decreaseSpeed() {  
+  if (IrReceiver.decodedIRData.decodedRawData == 0xB54AFF00) {  
+    x -= 10;  
+    if (x < 0) x = 0;  
+  }  
+}  
