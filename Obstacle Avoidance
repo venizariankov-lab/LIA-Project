@@ -1,5 +1,5 @@
 /*
-This program makes a small car drive autonomously while avoiding obstacles.
+This program makes a robot car drive autonomously while avoiding obstacles.
 It uses a servo-mounted ultrasonic sensor to “look” in front, left, and right.
 */
 
