@@ -1,5 +1,5 @@
 /*
-  This code makes the car follow a preset route,
+  This code makes a robot car follow a preset route,
   driving in a rectangular path by moving forward
   for set amounts of time and turning 90° at each corner.
 */
